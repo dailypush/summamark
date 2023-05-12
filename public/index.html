@@ -20,32 +20,80 @@
         const uploadForm = document.getElementById('uploadForm');
         const statusDiv = document.getElementById('status');
 
+        function setStatus(status) {
+            statusDiv.innerHTML = `<p>${status}</p>`;
+        }
+
+        async function processBookmarks(bookmarks) {
+            setStatus(`Processing ${bookmarks.length} bookmarks...`);
+
+            const response = await fetch('/process-bookmarks', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ bookmarks: bookmarks }),
+            });
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+
+            let bookmarksProcessed = 0;
+            let buffer = '';
+
+            while (true) {
+                const { value, done } = await reader.read();
+
+                if (done) break;
+
+                buffer += decoder.decode(value);
+                const parts = buffer.split('\n').filter((part) => part.length > 0);
+
+                if (parts.length > 1) {
+                    const bookmark = JSON.parse(parts.shift());
+                    buffer = parts.join('\n');
+
+                    bookmarksProcessed++;
+                    setStatus(`Processed ${bookmarksProcessed} of ${bookmarks.length} bookmarks`);
+                }
+            }
+
+            setStatus('All bookmarks processed');
+        }
+
         uploadForm.addEventListener('submit', async (event) => {
             event.preventDefault();
 
-            const formData = new FormData(uploadForm);
-            const response = await fetch('/upload', {
-                method: 'POST',
-                body: formData,
-            });
+            const bookmarksFile = document.getElementById('bookmarksFile').files[0];
+            const reader = new FileReader();
 
-            if (response.ok) {
-                const parsedStatus = await response.json();
-                statusDiv.innerHTML = `<p>${parsedStatus.message} Bookmarks count: ${parsedStatus.bookmarksCount}</p>`;
+            reader.onload = async function (e) {
+                const bookmarksFileContent = e.target.result;
+                const parser = new DOMParser();
+                const xmlDoc = parser.parseFromString(bookmarksFileContent, "text/html");
 
-                // Display the parsed bookmarks
+                const bookmarks = Array.from(xmlDoc.querySelectorAll('a')).map(element => ({
+                    title: element.textContent,
+                    url: element.getAttribute('href')
+                }));
+
+                setStatus(`Bookmarks file parsed successfully. Bookmarks count: ${bookmarks.length}`);
+
                 const bookmarksList = document.createElement('ul');
-                parsedStatus.bookmarks.forEach((bookmark) => {
+                bookmarks.forEach((bookmark) => {
                     const listItem = document.createElement('li');
                     listItem.innerHTML = `<a href="${bookmark.url}" target="_blank">${bookmark.title}</a>`;
                     bookmarksList.appendChild(listItem);
                 });
                 statusDiv.appendChild(bookmarksList);
-            } else {
-                statusDiv.innerHTML = '<p>Error uploading file</p>';
-            }
+
+                await processBookmarks(bookmarks);
+            };
+
+            reader.readAsText(bookmarksFile);
         });
     </script>
+
 
 </body>
 
