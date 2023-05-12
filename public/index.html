@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bookmarks App</title>
+</head>
+
+<body>
+    <h1>Bookmarks App</h1>
+    <form id="uploadForm" enctype="multipart/form-data">
+        <label for="bookmarksFile">Upload your bookmarks file:</label>
+        <input type="file" id="bookmarksFile" name="bookmarksFile" required>
+        <button type="submit">Upload</button>
+    </form>
+    <div id="status"></div>
+
+    <script>
+        const uploadForm = document.getElementById('uploadForm');
+        const statusDiv = document.getElementById('status');
+
+        uploadForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+
+            const formData = new FormData(uploadForm);
+            const response = await fetch('/upload', {
+                method: 'POST',
+                body: formData,
+            });
+
+            if (response.ok) {
+                const parsedStatus = await response.json();
+                statusDiv.innerHTML = `<p>${parsedStatus.message} Bookmarks count: ${parsedStatus.bookmarksCount}</p>`;
+
+                // Display the parsed bookmarks
+                const bookmarksList = document.createElement('ul');
+                parsedStatus.bookmarks.forEach((bookmark) => {
+                    const listItem = document.createElement('li');
+                    listItem.innerHTML = `<a href="${bookmark.url}" target="_blank">${bookmark.title}</a>`;
+                    bookmarksList.appendChild(listItem);
+                });
+                statusDiv.appendChild(bookmarksList);
+            } else {
+                statusDiv.innerHTML = '<p>Error uploading file</p>';
+            }
+        });
+    </script>
+
+</body>
+
+</html>
